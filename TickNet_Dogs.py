@@ -32,6 +32,8 @@ def get_args():
     # parser.add_argument('-d', '--dataset', choices=['cifar10', 'cifar100', 'dogs'], required=True, help='Dataset name.')
     parser.add_argument('-d', '--dataset', type=str, choices=[
                         'cifar10', 'cifar100', 'dogs'], default='dogs', help='Dataset name.')
+    parser.add_argument('--architecture-types', nargs='+', default=[
+                        'basic', 'small', 'large'], help='List of architecture types to use.')
     parser.add_argument('--download', action='store_true',
                         help='Download the specified dataset before running the training.')
     parser.add_argument('-g', '--gpu-id', default=1, type=int,
@@ -234,7 +236,7 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    args.gpu_id = 1
+    # args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
 
@@ -242,8 +244,8 @@ def main():
     torch.autograd.set_detect_anomaly(True)
 
     # Set the base directory
-    arr_typesize = ['basic', 'small', 'large']
-    for typesize in arr_typesize:
+    arr_architecture_types = args.architecture_types
+    for typesize in arr_architecture_types:
         strmode = 'StanfordDogs_TickNet_' + typesize + '_SE'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
         filenameLOG = pathout + '/' + strmode + '.txt'
