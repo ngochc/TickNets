@@ -50,6 +50,9 @@ def get_args():
                         type=float, help='SGD momentum.')
     parser.add_argument('-w', '--weight-decay', default=1e-4,
                         type=float, help='SGD weight decay.')
+    # Add the base directory argument
+    parser.add_argument('--base-dir', type=str, default='.',
+                        help='Base directory for saving checkpoints and reports.')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
     return parser.parse_args()
@@ -175,27 +178,30 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
     return (sum(losses) / len(losses), sum(accs) / len(accs))
 
 
-def get_unique_file_path(result_dir, base_filename, total_epochs):
+def get_unique_file_path(result_dir, base_filename, total_epochs, batch_size):
     """
     Create a unique file path by adding an index at the end of the file name if the file already exists.
     """
     result_file_path = os.path.join(
-        result_dir, f'{base_filename}_epochs{total_epochs}.csv')
+        result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}.csv'
+    )
     index = 1
     while os.path.isfile(result_file_path):
         result_file_path = os.path.join(
-            result_dir, f'{base_filename}_epochs{total_epochs}_{index}.csv')
+            result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}_{index}.csv'
+        )
         index += 1
     return result_file_path
 
 
-def initialize_csv_file(result_dir, total_epochs):
+def initialize_csv_file(result_dir, total_epochs, batch_size):
     """
     Create a CSV file with a unique name and write the header.
     """
     base_filename = 'result'
     result_file_path = get_unique_file_path(
-        result_dir, base_filename, total_epochs)
+        result_dir, base_filename, total_epochs, batch_size
+    )
     header = ['Epoch', 'Train Loss', 'Train Accuracy',
               'Validation Loss', 'Validation Accuracy']
 
@@ -228,27 +234,31 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
+    args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
 
     # print model with parameter and FLOPs counts
     torch.autograd.set_detect_anomaly(True)
 
+    # Set the base directory
     arr_typesize = ['basic', 'small', 'large']
     for typesize in arr_typesize:
         strmode = 'StanfordDogs_TickNet_' + typesize + '_SE'
-        pathout = './checkpoints/' + strmode
+        pathout = f'{args.base_dir}/checkpoints/{strmode}'
         filenameLOG = pathout + '/' + strmode + '.txt'
         if not os.path.exists(pathout):
             os.makedirs(pathout)
 
         # Directory for logging results to CSV
-        result_dir = './report/' + 'StanfordDogs_' + typesize
+        result_dir = f'{args.base_dir}/report/StanfordDogs_{typesize}'
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
 
         # Initialize CSV file once for the entire run
-        result_file_path = initialize_csv_file(result_dir, args.epochs)
+        result_file_path = initialize_csv_file(
+            result_dir, args.epochs, args.batch_size
+        )
 
         # get model
         model = build_TickNet(120, typesize=typesize, cifar=False)
@@ -278,7 +288,7 @@ def main():
         val_loader = get_data_loader(args=args, train=False)
 
         if args.evaluate:
-            pathcheckpoint = "./checkpoints/StanfordDogs/small/model_best.pth"
+            pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs/{strmode}/model_best.pth'
             if os.path.isfile(pathcheckpoint):
                 print("=> loading checkpoint '{}'".format(pathcheckpoint))
                 checkpoint = torch.load(pathcheckpoint)
