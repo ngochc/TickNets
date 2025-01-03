@@ -137,7 +137,6 @@ class SpatialTickNet(TickNet):
                  init_conv_stride,
                  channels,
                  strides,
-                 spatial_dim,
                  in_channels=3,
                  in_size=(224, 224),
                  use_data_batchnorm=True,
@@ -145,7 +144,6 @@ class SpatialTickNet(TickNet):
         super().__init__(num_classes, init_conv_channels, init_conv_stride,
                          channels, strides, in_channels, in_size, use_data_batchnorm)
 
-        self.spatial_layer = nn.Linear(spatial_dim, self.final_conv_channels)
         self.config = config
 
     def add_stages(self, in_channels, channels, strides):
