@@ -57,6 +57,9 @@ def get_args():
                         help='Base directory for saving checkpoints and reports.')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
+    parser.add_argument('--network-type', type=str, choices=[
+                        'tickNet', 'spatialTickNet'], default='tickNet', help='Type of network to use.')
+
     return parser.parse_args()
 
 
@@ -236,7 +239,6 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    # args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
 
@@ -246,14 +248,26 @@ def main():
     # Set the base directory
     arr_architecture_types = args.architecture_types
     for typesize in arr_architecture_types:
-        strmode = 'StanfordDogs_TickNet_' + typesize + '_SE'
-        pathout = f'{args.base_dir}/checkpoints/{strmode}'
+        if args.network_type == 'tickNet':
+            strmode = f'StanfordDogs_TickNet_{typesize}_SE'
+        elif args.network_type == 'spatialTickNet':
+            strmode = f'StanfordDogs_TickNet_spatial_{typesize}_SE'
+
+        if args.network_type == 'tickNet':
+            pathout = f'{args.base_dir}/checkpoints/{strmode}'
+        elif args.network_type == 'spatialTickNet':
+            pathout = f'{args.base_dir}/checkpoints/spatial_{strmode}'
+
         filenameLOG = pathout + '/' + strmode + '.txt'
         if not os.path.exists(pathout):
             os.makedirs(pathout)
 
         # Directory for logging results to CSV
-        result_dir = f'{args.base_dir}/report/StanfordDogs_{typesize}'
+        if args.network_type == 'tickNet':
+            result_dir = f'{args.base_dir}/report/StanfordDogs_{typesize}'
+        elif args.network_type == 'spatialTickNet':
+            result_dir = f'{args.base_dir}/report/StanfordDogs_spatial{typesize}'
+
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
 
@@ -263,7 +277,11 @@ def main():
         )
 
         # get model
-        model = build_TickNet(120, typesize=typesize, cifar=False)
+        if args.network_type == 'tickNet':
+            model = build_TickNet(120, typesize=typesize, cifar=False)
+        elif args.network_type == 'spatialTickNet':
+            model = build_SpatialTickNet(120, typesize=typesize, cifar=False)
+
         model = model.to(device)
 
         print(model)
@@ -290,7 +308,11 @@ def main():
         val_loader = get_data_loader(args=args, train=False)
 
         if args.evaluate:
-            pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs/{strmode}/model_best.pth'
+            if args.network_type == 'tickNet':
+                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs/{strmode}/model_best.pth'
+            elif args.network_type == 'spatialTickNet':
+                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_spatial/{strmode}/model_best.pth'
+
             if os.path.isfile(pathcheckpoint):
                 print("=> loading checkpoint '{}'".format(pathcheckpoint))
                 checkpoint = torch.load(pathcheckpoint)
