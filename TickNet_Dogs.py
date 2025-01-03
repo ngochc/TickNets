@@ -59,6 +59,8 @@ def get_args():
                         help='evaluate model on validation set')
     parser.add_argument('--network-type', type=str, choices=[
                         'tickNet', 'spatialTickNet'], default='tickNet', help='Type of network to use.')
+    parser.add_argument('--config', type=str, choices=[
+                        'a', 'b', 'c'], default='a', help='Configuration type for SpatialTickNet.')
 
     return parser.parse_args()
 
@@ -239,6 +241,7 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
+    # args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
 
@@ -280,7 +283,7 @@ def main():
         if args.network_type == 'tickNet':
             model = build_TickNet(120, typesize=typesize, cifar=False)
         elif args.network_type == 'spatialTickNet':
-            model = build_SpatialTickNet(120, typesize=typesize, cifar=False)
+            model = build_SpatialTickNet(120, typesize=typesize, cifar=False, config=args.config)
 
         model = model.to(device)
 
