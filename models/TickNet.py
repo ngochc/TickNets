@@ -200,3 +200,31 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
                    channels=channels,
                    strides=strides,
                    in_size=in_size)
+
+
+def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a'):
+    init_conv_channels = 32
+    channel_options = {
+        'basic': [[256, 128], [64], [128], [256], [512]]
+    }
+    channels = channel_options.get(typesize, channel_options['basic'])
+    print(f'THE ACTUAL CHANNEL: {typesize}')
+    if cifar:
+        # TODO
+        NotImplemented
+    else:
+        in_size = (224, 224)
+        init_conv_stride = 2
+        if config == 'a':
+            strides = [1, 2, 2, 2, 2]
+        else:
+            strides = [2, 2, 2, 2, 1]
+    return SpatialTickNet(
+        num_classes=num_classes,
+        init_conv_channels=init_conv_channels,
+        init_conv_stride=init_conv_stride,
+        channels=channels,
+        strides=strides,
+        in_size=in_size,
+        config=config
+    )
