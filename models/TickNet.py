@@ -92,7 +92,7 @@ class TickNet(nn.Module):
         self.add_initial_conv(
             in_channels, init_conv_channels, init_conv_stride)
         self.add_stages(init_conv_channels, channels, strides)
-        self.add_final_conv()
+        self.add_final_conv(in_channels)
 
     def add_initial_conv(self, in_channels, init_conv_channels, init_conv_stride):
         self.backbone.add_module("init_conv", conv3x3_block(
@@ -109,9 +109,9 @@ class TickNet(nn.Module):
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         self.final_conv_channels = 1024
 
-    def add_final_conv(self):
+    def add_final_conv(self, in_channels):
         self.backbone.add_module("final_conv", conv1x1_block(
-            in_channels=self.final_conv_channels, out_channels=self.final_conv_channels, activation="relu"))
+            in_channels=in_channels, out_channels=self.final_conv_channels, activation="relu"))
         self.backbone.add_module(
             "global_pool", nn.AdaptiveAvgPool2d(output_size=1))
 
