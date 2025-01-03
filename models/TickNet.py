@@ -205,7 +205,7 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
 def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a'):
     init_conv_channels = 32
     channel_options = {
-        'basic': [[128], [64], [128], [256], [512]]
+        'basic': [[256 ,128], [64], [128], [256], [512]]
     }
     channels = channel_options.get(typesize, channel_options['basic'])
     print(f'THE ACTUAL CHANNEL: {typesize}')
