@@ -75,7 +75,7 @@ class TickNet(nn.Module):
 
         self.backbone = torch.nn.Sequential()
 
-        # data batchnorm
+       # data batchnorm
         if self.use_data_batchnorm:
             self.backbone.add_module("data_bn", torch.nn.BatchNorm2d(num_features=in_channels))
 
@@ -84,8 +84,8 @@ class TickNet(nn.Module):
 
         # stages
         in_channels = init_conv_channels
-        self.add_stages(in_channels, channels, strides)
-        self.final_conv_channels = 1024
+        in_channels = self.add_stages(in_channels, channels, strides)
+        self.final_conv_channels = 1024        
 
         self.backbone.add_module("final_conv", conv1x1_block(in_channels=in_channels, out_channels=self.final_conv_channels, activation="relu"))
         self.backbone.add_module("global_pool", torch.nn.AdaptiveAvgPool2d(output_size=1))
@@ -103,6 +103,7 @@ class TickNet(nn.Module):
                 stage.add_module("unit{}".format(unit_id + 1), FR_PDP_block(in_channels=in_channels, out_channels=unit_channels, stride=stride))
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
+        return in_channels
 
     def init_params(self):
         for name, module in self.backbone.named_modules():
@@ -157,6 +158,7 @@ class SpatialTickNet(TickNet):
                 print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1})')
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
+        return in_channels
 
 ###
 # %% model definitions
@@ -183,6 +185,7 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
             strides = [1, 2, 2, 2, 2]
         else:
             strides = [2, 1, 2, 2, 2]
+    
     return TickNet(num_classes=num_classes,
                    init_conv_channels=init_conv_channels,
                    init_conv_stride=init_conv_stride,
@@ -210,6 +213,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a')
             strides = [1, 2, 2, 2, 2]
         else:
             strides = [2, 2, 2, 2, 1]
+    
     return SpatialTickNet(
         num_classes=num_classes,
         init_conv_channels=init_conv_channels,
