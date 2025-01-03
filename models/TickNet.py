@@ -64,10 +64,14 @@ class TickNet(nn.Module):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True):
+                 use_data_batchnorm=True,
+                 config='a'
+                 ):
+
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
+        self.config = config
 
         self.backbone = nn.Sequential()
 
@@ -142,9 +146,7 @@ class SpatialTickNet(TickNet):
                  use_data_batchnorm=True,
                  config='a'):
         super().__init__(num_classes, init_conv_channels, init_conv_stride,
-                         channels, strides, in_channels, in_size, use_data_batchnorm)
-
-        self.config = config
+                         channels, strides, in_channels, in_size, use_data_batchnorm, config)
 
     def add_stages(self, in_channels, channels, strides):
         for stage_id, stage_channels in enumerate(channels):
@@ -203,10 +205,12 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
 def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a'):
     init_conv_channels = 32
     channel_options = {
-        'basic': [[256, 128], [64], [128], [256], [512]]
+        'basic': [[128], [64], [128], [256], [512]]
     }
     channels = channel_options.get(typesize, channel_options['basic'])
     print(f'THE ACTUAL CHANNEL: {typesize}')
+    print(f'THE ACTUAL CHANNEL CONFIG: {config}')
+
     if cifar:
         # TODO
         NotImplemented
