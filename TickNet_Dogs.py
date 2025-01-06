@@ -270,7 +270,7 @@ def main():
         if args.network_type == 'tickNet':
             result_dir = f'{args.base_dir}/report/StanfordDogs_{typesize}'
         elif args.network_type == 'spatialTickNet':
-            result_dir = f'{args.base_dir}/report/StanfordDogs_spatial_{typesize}'
+            result_dir = f'{args.base_dir}/report/StanfordDogs_spatial_{typesize}_config_{args.config}'
 
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
