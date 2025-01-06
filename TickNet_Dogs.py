@@ -185,13 +185,22 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
     return (sum(losses) / len(losses), sum(accs) / len(accs))
 
 
-def get_unique_file_path(result_dir, base_filename, total_epochs, batch_size, config):
+def get_unique_file_path(result_dir, base_filename, args):
     """
     Create a unique file path by adding an index at the end of the file name if the file already exists.
     """
-    result_file_path = os.path.join(
-        result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}_config_{config}.csv'
-    )
+    total_epochs = args.epochs
+    batch_size = args.batch_size
+    config = args.config
+    if args.network_type == 'tickNet':
+        result_file_path = os.path.join(
+            result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}.csv'
+        )
+    else:
+        result_file_path = os.path.join(
+            result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}_config_{config}.csv'
+        )
+
     index = 1
     while os.path.isfile(result_file_path):
         result_file_path = os.path.join(
@@ -201,14 +210,12 @@ def get_unique_file_path(result_dir, base_filename, total_epochs, batch_size, co
     return result_file_path
 
 
-def initialize_csv_file(result_dir, total_epochs, batch_size, config):
+def initialize_csv_file(result_dir, args):
     """
     Create a CSV file with a unique name and write the header.
     """
     base_filename = 'result'
-    result_file_path = get_unique_file_path(
-        result_dir, base_filename, total_epochs, batch_size, config
-    )
+    result_file_path = get_unique_file_path(result_dir, base_filename, args)
     header = ['Epoch', 'Train Loss', 'Train Accuracy',
               'Validation Loss', 'Validation Accuracy']
 
@@ -276,9 +283,7 @@ def main():
             os.makedirs(result_dir)
 
         # Initialize CSV file once for the entire run
-        result_file_path = initialize_csv_file(
-            result_dir, args.epochs, args.batch_size, args.config
-        )
+        result_file_path = initialize_csv_file(result_dir, args)
 
         # get model
         if args.network_type == 'tickNet':
