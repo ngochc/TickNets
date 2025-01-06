@@ -250,16 +250,17 @@ def main():
 
     # Set the base directory
     arr_architecture_types = args.architecture_types
+    # TODO: currently, fix type for spatial TickNet
+    if args.network_type == 'spatialTickNet':
+        arr_architecture_types = ['basic']
+
     for typesize in arr_architecture_types:
         if args.network_type == 'tickNet':
             strmode = f'StanfordDogs_TickNet_{typesize}_SE'
         elif args.network_type == 'spatialTickNet':
-            strmode = f'StanfordDogs_TickNet_spatial_{typesize}_SE'
+            strmode = f'StanfordDogs_TickNet_spatial_{typesize}_config_{args.config}_SE'
 
-        if args.network_type == 'tickNet':
-            pathout = f'{args.base_dir}/checkpoints/{strmode}'
-        elif args.network_type == 'spatialTickNet':
-            pathout = f'{args.base_dir}/checkpoints/spatial_{strmode}'
+        pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
         filenameLOG = pathout + '/' + strmode + '.txt'
         if not os.path.exists(pathout):
@@ -269,7 +270,7 @@ def main():
         if args.network_type == 'tickNet':
             result_dir = f'{args.base_dir}/report/StanfordDogs_{typesize}'
         elif args.network_type == 'spatialTickNet':
-            result_dir = f'{args.base_dir}/report/StanfordDogs_spatial{typesize}'
+            result_dir = f'{args.base_dir}/report/StanfordDogs_spatial_{typesize}'
 
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
@@ -315,7 +316,7 @@ def main():
             if args.network_type == 'tickNet':
                 pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs/{strmode}/model_best.pth'
             elif args.network_type == 'spatialTickNet':
-                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_spatial/{strmode}/model_best.pth'
+                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_spatial/{strmode}_config_{args.config}/model_best.pth'
 
             if os.path.isfile(pathcheckpoint):
                 print("=> loading checkpoint '{}'".format(pathcheckpoint))
