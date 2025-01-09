@@ -276,7 +276,8 @@ def main():
 
         if args.resume:
             state_dict, current_epoch = resume_from_checkpoint(result_file_path, pathout)
-            model = model.load_state_dict(state_dict)
+            if state_dict is not None:
+                model.load_state_dict(state_dict)
             if current_epoch is None:
                 return
         else:
