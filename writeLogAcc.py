@@ -27,7 +27,7 @@ def log_results_to_csv(file_path, current_epoch, train_loss, train_accuracy, val
     """
     Log the results to a CSV file.
     """
-    mode = open(file_path, 'w' if not os.path.exists(file_path) else 'a')
+    mode = 'w' if not os.path.exists(file_path) else 'a'
 
     result_row = [
         current_epoch + 1,
