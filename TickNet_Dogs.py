@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import glob
+import pandas as pd
 import argparse
 import csv
 import sys
@@ -61,7 +63,8 @@ def get_args():
                         'tickNet', 'spatialTickNet'], default='tickNet', help='Type of network to use.')
     parser.add_argument('--config', type=str, choices=[
                         'a', 'b', 'c'], default='a', help='Configuration type for SpatialTickNet.')
-
+    parser.add_argument('--resume', action='store_true',
+                        help='Resume training from a checkpoint.')
     return parser.parse_args()
 
 
@@ -185,61 +188,26 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
     return (sum(losses) / len(losses), sum(accs) / len(accs))
 
 
-def get_unique_file_path(result_dir, base_filename, args):
+def resume_from_checkpoint(result_file_path, pathout):
     """
-    Create a unique file path by adding an index at the end of the file name if the file already exists.
+    Resume from the latest checkpoint.
     """
-    total_epochs = args.epochs
-    batch_size = args.batch_size
-    config = args.config
-    if args.network_type == 'tickNet':
-        result_file_path = os.path.join(
-            result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}.csv'
-        )
+    if os.path.exists(result_file_path):
+        df = pd.read_csv(result_file_path)
+        last_epoch = df['Epoch'].max()
+        checkpoint_path = f'{pathout}/checkpoint_epoch{last_epoch + 1:>04d}_*.pth'
+        checkpoint_files = glob.glob(checkpoint_path)
+        if checkpoint_files:
+            checkpoint_file = checkpoint_files[0]
+            print(f"=> Resuming from checkpoint '{checkpoint_file}'")
+            checkpoint = torch.load(checkpoint_file)
+            return checkpoint['model_state_dict'], last_epoch
+        else:
+            print(f"=> No checkpoint found for epoch {last_epoch + 1}")
+            return None, None
     else:
-        result_file_path = os.path.join(
-            result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}_config_{config}.csv'
-        )
-
-    index = 1
-    while os.path.isfile(result_file_path):
-        result_file_path = os.path.join(
-            result_dir, f'{base_filename}_epochs{total_epochs}_batch{batch_size}_config_{config}_{index}.csv'
-        )
-        index += 1
-    return result_file_path
-
-
-def initialize_csv_file(result_dir, args):
-    """
-    Create a CSV file with a unique name and write the header.
-    """
-    base_filename = 'result'
-    result_file_path = get_unique_file_path(result_dir, base_filename, args)
-    header = ['Epoch', 'Train Loss', 'Train Accuracy',
-              'Validation Loss', 'Validation Accuracy']
-
-    # Create directory if it does not exist
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-
-    with open(result_file_path, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(header)
-
-    return result_file_path
-
-
-def log_results_to_csv(result_file_path, current_epoch, train_loss, train_accuracy, val_loss, val_accuracy):
-    """
-    Log the results to a CSV file.
-    """
-    result_row = [current_epoch + 1, train_loss,
-                  train_accuracy, val_loss, val_accuracy]
-
-    with open(result_file_path, 'a', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(result_row)
+        print(f"=> No result file found at '{result_file_path}'")
+        return None, None
 
 
 def main():
@@ -270,20 +238,9 @@ def main():
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
         filenameLOG = pathout + '/' + strmode + '.txt'
+        result_file_path = pathout + '/' + strmode + '.csv'
         if not os.path.exists(pathout):
             os.makedirs(pathout)
-
-        # Directory for logging results to CSV
-        if args.network_type == 'tickNet':
-            result_dir = f'{args.base_dir}/report/StanfordDogs_{typesize}'
-        elif args.network_type == 'spatialTickNet':
-            result_dir = f'{args.base_dir}/report/StanfordDogs_spatial_{typesize}_config_{args.config}'
-
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
-
-        # Initialize CSV file once for the entire run
-        result_file_path = initialize_csv_file(result_dir, args)
 
         # get model
         if args.network_type == 'tickNet':
@@ -317,6 +274,15 @@ def main():
         train_loader = get_data_loader(args=args, train=True)
         val_loader = get_data_loader(args=args, train=False)
 
+        if args.resume:
+            state_dict, current_epoch = resume_from_checkpoint(
+                result_file_path, pathout, model)
+            model = model.load_state_dict(state_dict)
+            if current_epoch is None:
+                return
+        else:
+            current_epoch = 0
+
         if args.evaluate:
             if args.network_type == 'tickNet':
                 pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs/{strmode}/model_best.pth'
@@ -344,7 +310,7 @@ def main():
         # for each epoch...
         val_accuracy_max = None
         val_accuracy_argmax = None
-        for current_epoch in range(args.epochs):
+        for current_epoch in range(current_epoch, args.epochs):
             current_learning_rate = optimizer.param_groups[0]['lr']
             print(
                 f'Starting epoch {current_epoch + 1}/{args.epochs}, learning_rate={current_learning_rate}'
@@ -373,22 +339,25 @@ def main():
 
             # print epoch summary
             line = (
+                '=================================================================================='
                 f'Epoch {current_epoch + 1}/{args.epochs} summary: '
                 f'loss_train={train_loss:.5f}, '
                 f'acc_train={100.0 * train_accuracy:.2f}%, '
                 f'loss_val={val_loss:.2f}, '
                 f'acc_val={100.0 * val_accuracy:.2f}% '
                 f'(best: {100.0 * val_accuracy_max:.2f}% @ epoch {val_accuracy_argmax + 1})'
+                '=================================================================================='
+            )
+            print(line)
+            wA.writeLogAcc(filenameLOG, line)
+            wA.log_results_to_csv(
+                result_file_path, current_epoch+1, train_loss,
+                100.0 * train_accuracy, val_loss, 100.0 * val_accuracy
             )
 
-            print('=' * len(line))
-            print(line)
-            print('=' * len(line))
-            wA.writeLogAcc(filenameLOG, line)
 
-            # Log results to CSV
-            log_results_to_csv(result_file_path, current_epoch,
-                               train_loss, train_accuracy, val_loss, val_accuracy)
+if __name__ == '__main__':
+    main()
 
 
 if __name__ == '__main__':
