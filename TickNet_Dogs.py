@@ -275,8 +275,7 @@ def main():
         val_loader = get_data_loader(args=args, train=False)
 
         if args.resume:
-            state_dict, current_epoch = resume_from_checkpoint(
-                result_file_path, pathout, model)
+            state_dict, current_epoch = resume_from_checkpoint(result_file_path, pathout)
             model = model.load_state_dict(state_dict)
             if current_epoch is None:
                 return
