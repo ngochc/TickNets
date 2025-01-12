@@ -58,8 +58,6 @@ def get_args():
                         help='Base directory for saving checkpoints')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--config', type=str, choices=[
-                        'a', 'b', 'c'], default='a', help='Configuration type for SpatialTickNet.')
     return parser.parse_args()
 
 
@@ -200,7 +198,7 @@ def main():
     arr_architecture_types = args.architecture_types
 
     for typesize in arr_architecture_types:
-        strmode = f'StanfordDogs_S_TickNet_{typesize}_config_{args.config}_SE'
+        strmode = f'StanfordDogs_S_TickNet_{typesize}_SE'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
         filenameLOG = pathout + '/' + strmode + '.txt'
@@ -209,7 +207,7 @@ def main():
             os.makedirs(pathout)
 
         # get model
-        model = build_SpatialTickNet(120, typesize=typesize, cifar=False, config=args.config)
+        model = build_SpatialTickNet(120, typesize=typesize, cifar=False)
         model = model.to(device)
 
         print(model)

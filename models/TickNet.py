@@ -64,14 +64,12 @@ class TickNet(nn.Module):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True,
-                 config='a'
+                 use_data_batchnorm=True
                  ):
 
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
-        self.config = config
 
         self.backbone = torch.nn.Sequential()
 
@@ -133,22 +131,15 @@ class SpatialTickNet(TickNet):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True,
-                 config='a'):
+                 use_data_batchnorm=True):
         super().__init__(num_classes, init_conv_channels, init_conv_stride,
-                         channels, strides, in_channels, in_size, use_data_batchnorm, config)
+                         channels, strides, in_channels, in_size, use_data_batchnorm)
 
     def add_stages(self, in_channels, channels, strides):
         for stage_id, stage_channels in enumerate(channels):
             stage = nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
-                if self.config == 'a':
-                    stride = strides[stage_id] if unit_id == 0 else 1
-                elif self.config == 'b':
-                    stride = strides[stage_id] if unit_id == len(
-                        stage_channels) - 1 else 1
-                elif self.config == 'c':
-                    stride = strides[stage_id] if unit_id == 0 else 1
+                stride = strides[stage_id] if unit_id == 0 else 1
 
                 stage.add_module(
                     "unit{}".format(unit_id + 1),
@@ -194,7 +185,7 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
                    in_size=in_size)
 
 
-def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a'):
+def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
     init_conv_channels = 32
     channel_options = {
         'basic': [[256 ,128], [64], [128], [256], [512]],
@@ -203,7 +194,6 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a')
     }
     channels = channel_options.get(typesize, channel_options['basic'])
     print(f'THE ACTUAL CHANNEL: {typesize}')
-    print(f'THE ACTUAL CHANNEL CONFIG: {config}')
 
     if cifar:
         in_size = (32, 32)
@@ -212,10 +202,10 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a')
     else:
         in_size = (224, 224)
         init_conv_stride = 2
-        if config == 'a':
+        if typesize == 'basic':
             strides = [1, 2, 2, 2, 2]
         else:
-            strides = [2, 2, 2, 2, 1]
+            strides = [2, 1, 2, 2, 2]
     
     return SpatialTickNet(
         num_classes=num_classes,
@@ -223,6 +213,5 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a')
         init_conv_stride=init_conv_stride,
         channels=channels,
         strides=strides,
-        in_size=in_size,
-        config=config
+        in_size=in_size
     )
