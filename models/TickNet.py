@@ -204,8 +204,9 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, config='a')
     print(f'THE ACTUAL CHANNEL CONFIG: {config}')
 
     if cifar:
-        # TODO
-        NotImplemented
+        in_size = (32, 32)
+        init_conv_stride = 1
+        strides = [1, 1, 2, 2, 2]
     else:
         in_size = (224, 224)
         init_conv_stride = 2
