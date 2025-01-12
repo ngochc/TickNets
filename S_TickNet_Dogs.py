@@ -198,8 +198,6 @@ def main():
 
     # Set the base directory
     arr_architecture_types = args.architecture_types
-    # TODO: currently, fix type for spatial TickNet
-    arr_architecture_types = ['basic']
 
     for typesize in arr_architecture_types:
         strmode = f'StanfordDogs_S_TickNet_{typesize}_config_{args.config}_SE'
