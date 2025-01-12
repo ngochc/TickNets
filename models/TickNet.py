@@ -155,7 +155,7 @@ class SpatialTickNet(TickNet):
                     FR_PDP_block(in_channels=in_channels,
                                  out_channels=unit_channels, stride=stride)
                 )
-                print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1})')
+                print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         return in_channels
