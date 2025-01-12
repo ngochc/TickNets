@@ -55,13 +55,11 @@ def get_args():
                         type=float, help='SGD weight decay.')
     # Add the base directory argument
     parser.add_argument('--base-dir', type=str, default='.',
-                        help='Base directory for saving checkpoints and reports.')
+                        help='Base directory for saving checkpoints')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
     parser.add_argument('--config', type=str, choices=[
                         'a', 'b', 'c'], default='a', help='Configuration type for SpatialTickNet.')
-    parser.add_argument('--resume', action='store_true',
-                        help='Resume training from a checkpoint.')
     return parser.parse_args()
 
 
@@ -185,28 +183,6 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
     return (sum(losses) / len(losses), sum(accs) / len(accs))
 
 
-def resume_from_checkpoint(result_file_path, pathout):
-    """
-    Resume from the latest checkpoint.
-    """
-    if os.path.exists(result_file_path):
-        df = pd.read_csv(result_file_path)
-        last_epoch = df['Epoch'].max()
-        checkpoint_path = f'{pathout}/checkpoint_epoch{last_epoch + 1:>04d}_*.pth'
-        checkpoint_files = glob.glob(checkpoint_path)
-        if checkpoint_files:
-            checkpoint_file = checkpoint_files[0]
-            print(f"=> Resuming from checkpoint '{checkpoint_file}'")
-            checkpoint = torch.load(checkpoint_file)
-            return checkpoint['model_state_dict'], last_epoch
-        else:
-            print(f"=> No checkpoint found for epoch {last_epoch + 1}")
-            return None, None
-    else:
-        print(f"=> No result file found at '{result_file_path}'")
-        return None, None
-
-
 def main():
     """
     Run the complete model training.
@@ -223,15 +199,10 @@ def main():
     # Set the base directory
     arr_architecture_types = args.architecture_types
     # TODO: currently, fix type for spatial TickNet
-    if args.network_type == 'spatialTickNet':
-        arr_architecture_types = ['basic']
+    arr_architecture_types = ['basic']
 
     for typesize in arr_architecture_types:
-        if args.network_type == 'tickNet':
-            strmode = f'StanfordDogs_TickNet_{typesize}_SE'
-        elif args.network_type == 'spatialTickNet':
-            strmode = f'StanfordDogs_TickNet_spatial_{typesize}_config_{args.config}_SE'
-
+        strmode = f'StanfordDogs_S_TickNet_{typesize}_config_{args.config}_SE'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
         filenameLOG = pathout + '/' + strmode + '.txt'
@@ -240,17 +211,13 @@ def main():
             os.makedirs(pathout)
 
         # get model
-        if args.network_type == 'tickNet':
-            model = build_TickNet(120, typesize=typesize, cifar=False)
-        elif args.network_type == 'spatialTickNet':
-            model = build_SpatialTickNet(
-                120, typesize=typesize, cifar=False, config=args.config)
-
+        model = build_SpatialTickNet(120, typesize=typesize, cifar=False, config=args.config)
         model = model.to(device)
 
         print(model)
         print('Number of model parameters: {}'.format(
-            sum([p.data.nelement() for p in model.parameters()])))
+            sum([p.data.nelement() for p in model.parameters()]))
+        )
 
         # define loss function and optimizer
         criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -271,21 +238,8 @@ def main():
         train_loader = get_data_loader(args=args, train=True)
         val_loader = get_data_loader(args=args, train=False)
 
-        if args.resume:
-            state_dict, current_epoch = resume_from_checkpoint(result_file_path, pathout)
-            if state_dict is not None:
-                model.load_state_dict(state_dict)
-            if current_epoch is None:
-                return
-        else:
-            current_epoch = 0
-
         if args.evaluate:
-            if args.network_type == 'tickNet':
-                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs/{strmode}/model_best.pth'
-            elif args.network_type == 'spatialTickNet':
-                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_spatial/{strmode}_config_{args.config}/model_best.pth'
-
+            pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_S_TickNet/{strmode}/model_best.pth'
             if os.path.isfile(pathcheckpoint):
                 print("=> loading checkpoint '{}'".format(pathcheckpoint))
                 checkpoint = torch.load(pathcheckpoint)
@@ -307,25 +261,25 @@ def main():
         # for each epoch...
         val_accuracy_max = None
         val_accuracy_argmax = None
-        for current_epoch in range(current_epoch, args.epochs):
+        for n_epoch in range(args.epochs):
             current_learning_rate = optimizer.param_groups[0]['lr']
             print(
-                f'Starting epoch {current_epoch + 1}/{args.epochs}, learning_rate={current_learning_rate}'
+                f'Starting epoch {n_epoch + 1}/{args.epochs}, learning_rate={current_learning_rate}'
             )
 
             # train
             (train_loss, train_accuracy) = run_epoch(train=True, data_loader=train_loader, model=model,
-                                                     criterion=criterion, optimizer=optimizer, n_epoch=current_epoch, args=args, device=device)
+                                                     criterion=criterion, optimizer=optimizer, n_epoch=n_epoch, args=args, device=device)
 
             # validate
             (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
-                                                 criterion=criterion, optimizer=None, n_epoch=current_epoch, args=args, device=device)
+                                                 criterion=criterion, optimizer=None, n_epoch=n_epoch, args=args, device=device)
             if (val_accuracy_max is None) or (val_accuracy > val_accuracy_max):
                 val_accuracy_max = val_accuracy
-                val_accuracy_argmax = current_epoch
+                val_accuracy_argmax = n_epoch
                 torch.save(
                     {"model_state_dict": model.state_dict()},
-                    f'{pathout}/checkpoint_epoch{current_epoch + 1:>04d}_{100.0 * val_accuracy_max:.2f}.pth'
+                    f'{pathout}/checkpoint_epoch{n_epoch + 1:>04d}_{100.0 * val_accuracy_max:.2f}.pth'
                 )
 
             # adjust learning rate
@@ -337,7 +291,7 @@ def main():
             # print epoch summary
             line = (
                 '=================================================================================='
-                f'Epoch {current_epoch + 1}/{args.epochs} summary: '
+                f'Epoch {n_epoch + 1}/{args.epochs} summary: '
                 f'loss_train={train_loss:.5f}, '
                 f'acc_train={100.0 * train_accuracy:.2f}%, '
                 f'loss_val={val_loss:.2f}, '
@@ -348,14 +302,9 @@ def main():
             print(line)
             wA.writeLogAcc(filenameLOG, line)
             wA.log_results_to_csv(
-                result_file_path, current_epoch+1, train_loss,
+                result_file_path, n_epoch+1, train_loss,
                 100.0 * train_accuracy, val_loss, 100.0 * val_accuracy
             )
-
-
-if __name__ == '__main__':
-    main()
-
 
 if __name__ == '__main__':
     try:
