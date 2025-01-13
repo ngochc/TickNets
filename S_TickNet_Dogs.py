@@ -34,7 +34,8 @@ def get_args():
     # parser.add_argument('-d', '--dataset', choices=['cifar10', 'cifar100', 'dogs'], required=True, help='Dataset name.')
     parser.add_argument('-d', '--dataset', type=str, choices=[
                         'cifar10', 'cifar100', 'dogs'], default='dogs', help='Dataset name.')
-    parser.add_argument('--architecture-types', nargs='+', default=['basic'], help='List of architecture types to use.')
+    parser.add_argument('--architecture-types', nargs='+',
+                        default=['basic'], help='List of architecture types to use.')
     parser.add_argument('--download', action='store_true',
                         help='Download the specified dataset before running the training.')
     parser.add_argument('-g', '--gpu-id', default=1, type=int,
@@ -196,111 +197,114 @@ def main():
 
     # Set the base directory
     arr_architecture_types = args.architecture_types
-
+    arr_architecture_types = ['large']
     for typesize in arr_architecture_types:
-        strmode = f'StanfordDogs_S_TickNet_{typesize}_SE'
-        pathout = f'{args.base_dir}/checkpoints/{strmode}'
+        for large_option in range(5):  # run all options for 'large' typesize
+            strmode = f'StanfordDogs_S_TickNet_{typesize}_mode{large_option}_SE'
+            pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
-        filenameLOG = pathout + '/' + strmode + '.txt'
-        result_file_path = pathout + '/' + strmode + '.csv'
-        if not os.path.exists(pathout):
-            os.makedirs(pathout)
+            filenameLOG = pathout + '/' + strmode + '.txt'
+            result_file_path = pathout + '/' + strmode + '.csv'
+            if not os.path.exists(pathout):
+                os.makedirs(pathout)
 
-        # get model
-        model = build_SpatialTickNet(120, typesize=typesize, cifar=False)
-        model = model.to(device)
+            # get model
+            model = build_SpatialTickNet(
+                120, typesize=typesize, cifar=False, large_option=large_option)
+            model = model.to(device)
 
-        print(model)
-        print('Number of model parameters: {}'.format(
-            sum([p.data.nelement() for p in model.parameters()]))
-        )
+            print(model)
+            print('Number of model parameters: {}'.format(
+                sum([p.data.nelement() for p in model.parameters()]))
+            )
 
-        # define loss function and optimizer
-        criterion = torch.nn.CrossEntropyLoss().to(device)
-        optimizer = torch.optim.SGD(
-            params=model.parameters(),
-            lr=args.learning_rate,
-            momentum=args.momentum,
-            weight_decay=args.weight_decay
-        )
+            # define loss function and optimizer
+            criterion = torch.nn.CrossEntropyLoss().to(device)
+            optimizer = torch.optim.SGD(
+                params=model.parameters(),
+                lr=args.learning_rate,
+                momentum=args.momentum,
+                weight_decay=args.weight_decay
+            )
 
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer,
-            milestones=args.schedule,
-            gamma=0.1
-        )
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer=optimizer,
+                milestones=args.schedule,
+                gamma=0.1
+            )
 
-        # get train and val data loaders
-        train_loader = get_data_loader(args=args, train=True)
-        val_loader = get_data_loader(args=args, train=False)
+            # get train and val data loaders
+            train_loader = get_data_loader(args=args, train=True)
+            val_loader = get_data_loader(args=args, train=False)
 
-        if args.evaluate:
-            pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_S_TickNet/{strmode}/model_best.pth'
-            if os.path.isfile(pathcheckpoint):
-                print("=> loading checkpoint '{}'".format(pathcheckpoint))
-                checkpoint = torch.load(pathcheckpoint)
-                model.load_state_dict(checkpoint['model_state_dict'])
-                del checkpoint
-            else:
-                print("=> no checkpoint found at '{}'".format(pathcheckpoint))
+            if args.evaluate:
+                pathcheckpoint = f'{args.base_dir}/checkpoints/StanfordDogs_S_TickNet/{strmode}/model_best.pth'
+                if os.path.isfile(pathcheckpoint):
+                    print("=> loading checkpoint '{}'".format(pathcheckpoint))
+                    checkpoint = torch.load(pathcheckpoint)
+                    model.load_state_dict(checkpoint['model_state_dict'])
+                    del checkpoint
+                else:
+                    print("=> no checkpoint found at '{}'".format(pathcheckpoint))
+                    return
+                m = time.time()
+                (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
+                                                     criterion=criterion, optimizer=None, n_epoch=0, args=args, device=device)
+                print(
+                    f'[ validating: ], loss_val={val_loss:.5f}, acc_val={100.0 * val_accuracy:.2f}%'
+                )
+                n = time.time()
+                print((n-m)/3600)
                 return
-            m = time.time()
-            (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
-                                                 criterion=criterion, optimizer=None, n_epoch=0, args=args, device=device)
-            print(
-                f'[ validating: ], loss_val={val_loss:.5f}, acc_val={100.0 * val_accuracy:.2f}%'
-            )
-            n = time.time()
-            print((n-m)/3600)
-            return
 
-        # for each epoch...
-        val_accuracy_max = None
-        val_accuracy_argmax = None
-        for n_epoch in range(args.epochs):
-            current_learning_rate = optimizer.param_groups[0]['lr']
-            print(
-                f'Starting epoch {n_epoch + 1}/{args.epochs}, learning_rate={current_learning_rate}'
-            )
-
-            # train
-            (train_loss, train_accuracy) = run_epoch(train=True, data_loader=train_loader, model=model,
-                                                     criterion=criterion, optimizer=optimizer, n_epoch=n_epoch, args=args, device=device)
-
-            # validate
-            (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
-                                                 criterion=criterion, optimizer=None, n_epoch=n_epoch, args=args, device=device)
-            if (val_accuracy_max is None) or (val_accuracy > val_accuracy_max):
-                val_accuracy_max = val_accuracy
-                val_accuracy_argmax = n_epoch
-                torch.save(
-                    {"model_state_dict": model.state_dict()},
-                    f'{pathout}/checkpoint_epoch{n_epoch + 1:>04d}_{100.0 * val_accuracy_max:.2f}.pth'
+            # for each epoch...
+            val_accuracy_max = None
+            val_accuracy_argmax = None
+            for n_epoch in range(args.epochs):
+                current_learning_rate = optimizer.param_groups[0]['lr']
+                print(
+                    f'Starting epoch {n_epoch + 1}/{args.epochs}, learning_rate={current_learning_rate}'
                 )
 
-            # adjust learning rate
-            scheduler.step()
+                # train
+                (train_loss, train_accuracy) = run_epoch(train=True, data_loader=train_loader, model=model,
+                                                         criterion=criterion, optimizer=optimizer, n_epoch=n_epoch, args=args, device=device)
 
-            # save the model weights
-            # torch.save({"model_state_dict": model.state_dict()}, 'checkpoint_epoch{:>04d}.pth'.format(n_epoch + 1))
+                # validate
+                (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
+                                                     criterion=criterion, optimizer=None, n_epoch=n_epoch, args=args, device=device)
+                if (val_accuracy_max is None) or (val_accuracy > val_accuracy_max):
+                    val_accuracy_max = val_accuracy
+                    val_accuracy_argmax = n_epoch
+                    torch.save(
+                        {"model_state_dict": model.state_dict()},
+                        f'{pathout}/checkpoint_epoch{n_epoch + 1:>04d}_{100.0 * val_accuracy_max:.2f}.pth'
+                    )
 
-            # print epoch summary
-            line = (
-                '=================================================================================='
-                f'Epoch {n_epoch + 1}/{args.epochs} summary: '
-                f'loss_train={train_loss:.5f}, '
-                f'acc_train={100.0 * train_accuracy:.2f}%, '
-                f'loss_val={val_loss:.2f}, '
-                f'acc_val={100.0 * val_accuracy:.2f}% '
-                f'(best: {100.0 * val_accuracy_max:.2f}% @ epoch {val_accuracy_argmax + 1})'
-                '=================================================================================='
-            )
-            print(line)
-            wA.writeLogAcc(filenameLOG, line)
-            wA.log_results_to_csv(
-                result_file_path, n_epoch+1, train_loss,
-                100.0 * train_accuracy, val_loss, 100.0 * val_accuracy
-            )
+                # adjust learning rate
+                scheduler.step()
+
+                # save the model weights
+                # torch.save({"model_state_dict": model.state_dict()}, 'checkpoint_epoch{:>04d}.pth'.format(n_epoch + 1))
+
+                # print epoch summary
+                line = (
+                    '=================================================================================='
+                    f'Epoch {n_epoch + 1}/{args.epochs} summary: '
+                    f'loss_train={train_loss:.5f}, '
+                    f'acc_train={100.0 * train_accuracy:.2f}%, '
+                    f'loss_val={val_loss:.2f}, '
+                    f'acc_val={100.0 * val_accuracy:.2f}% '
+                    f'(best: {100.0 * val_accuracy_max:.2f}% @ epoch {val_accuracy_argmax + 1})'
+                    '=================================================================================='
+                )
+                print(line)
+                wA.writeLogAcc(filenameLOG, line)
+                wA.log_results_to_csv(
+                    result_file_path, n_epoch+1, train_loss,
+                    100.0 * train_accuracy, val_loss, 100.0 * val_accuracy
+                )
+
 
 if __name__ == '__main__':
     try:
