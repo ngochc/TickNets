@@ -190,7 +190,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
     channel_options = {
         'basic': [[256 ,128], [64], [128], [256], [512]],
         'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
-        'large': [[256], [128, 64, 128], [256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]],
+        'large': [[256], [128, 64], [128, 256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]],
     }
     channels = channel_options.get(typesize, channel_options['basic'])
     print(f'THE ACTUAL CHANNEL: {typesize}')
