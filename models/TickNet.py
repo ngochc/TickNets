@@ -75,26 +75,21 @@ class TickNet(nn.Module):
 
        # data batchnorm
         if self.use_data_batchnorm:
-            self.backbone.add_module(
-                "data_bn", torch.nn.BatchNorm2d(num_features=in_channels))
+            self.backbone.add_module("data_bn", torch.nn.BatchNorm2d(num_features=in_channels))
 
         # init conv
-        self.backbone.add_module("init_conv", conv3x3_block(
-            in_channels=in_channels, out_channels=init_conv_channels, stride=init_conv_stride))
+        self.backbone.add_module("init_conv", conv3x3_block(in_channels=in_channels, out_channels=init_conv_channels, stride=init_conv_stride))
 
         # stages
         in_channels = init_conv_channels
         in_channels = self.add_stages(in_channels, channels, strides)
-        self.final_conv_channels = 1024
+        self.final_conv_channels = 1024        
 
-        self.backbone.add_module("final_conv", conv1x1_block(
-            in_channels=in_channels, out_channels=self.final_conv_channels, activation="relu"))
-        self.backbone.add_module(
-            "global_pool", torch.nn.AdaptiveAvgPool2d(output_size=1))
+        self.backbone.add_module("final_conv", conv1x1_block(in_channels=in_channels, out_channels=self.final_conv_channels, activation="relu"))
+        self.backbone.add_module("global_pool", torch.nn.AdaptiveAvgPool2d(output_size=1))
         in_channels = self.final_conv_channels
         # classifier
-        self.classifier = Classifier(
-            in_channels=in_channels, num_classes=num_classes)
+        self.classifier = Classifier(in_channels=in_channels, num_classes=num_classes)
 
         self.init_params()
 
@@ -102,9 +97,8 @@ class TickNet(nn.Module):
         for stage_id, stage_channels in enumerate(channels):
             stage = torch.nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
-                stride = strides[stage_id] if unit_id == 0 else 1
-                stage.add_module("unit{}".format(unit_id + 1), FR_PDP_block(
-                    in_channels=in_channels, out_channels=unit_channels, stride=stride))
+                stride = strides[stage_id] if unit_id == 0 else 1                
+                stage.add_module("unit{}".format(unit_id + 1), FR_PDP_block(in_channels=in_channels, out_channels=unit_channels, stride=stride))
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         return in_channels
@@ -152,8 +146,7 @@ class SpatialTickNet(TickNet):
                     FR_PDP_block(in_channels=in_channels,
                                  out_channels=unit_channels, stride=stride)
                 )
-                print(
-                    f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
+                print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         return in_channels
@@ -183,7 +176,7 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
             strides = [1, 2, 2, 2, 2]
         else:
             strides = [2, 1, 2, 2, 2]
-
+    
     return TickNet(num_classes=num_classes,
                    init_conv_channels=init_conv_channels,
                    init_conv_stride=init_conv_stride,
@@ -192,32 +185,15 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
                    in_size=in_size)
 
 
-def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, large_option=0):
+def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
     init_conv_channels = 32
-    large_options = [
-        [[256], [128, 64, 128, 256, 512], [256, 128, 64,
-                                           128, 256, 512], [256, 128, 64, 128, 256], [512]],
-        [[256], [128, 64, 128], [256, 512, 256, 128, 64, 128, 256],
-            [512, 256, 128, 64, 128, 256], [512]],
-        [[256], [128, 64, 128], [256, 512, 256, 128, 64, 128],
-            [256, 512, 256, 128, 64, 128, 256], [512]],
-        [[256], [128, 64], [128, 256, 512, 256, 128, 64, 128, 256],
-            [512, 256, 128, 64, 128, 256], [512]],
-        [[256], [128, 64], [128, 256, 512, 256, 128, 64,
-                            128, 256, 512], [256, 128, 64, 128, 256], [512]],
-    ]
-
     channel_options = {
-        'basic': [[256, 128], [64], [128], [256], [512]],
-        'small': [[256], [128, 64, 128], [256, 512, 256, 128], [64, 128, 256], [512]],
+        'basic': [[256 ,128], [64], [128], [256], [512]],
+        'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
+        'large': [[256], [128, 64, 128], [256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]],
     }
-
-    if typesize == 'large':
-        channels = large_options[large_option]
-    else:
-        channels = channel_options.get(typesize, channel_options['basic'])
-
-    print(f'THE ACTUAL CHANNEL: {typesize}, Option: {large_option}')
+    channels = channel_options.get(typesize, channel_options['basic'])
+    print(f'THE ACTUAL CHANNEL: {typesize}')
 
     if cifar:
         in_size = (32, 32)
@@ -230,7 +206,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, large_optio
             strides = [1, 2, 2, 2, 2]
         else:
             strides = [2, 1, 2, 2, 2]
-
+    
     return SpatialTickNet(
         num_classes=num_classes,
         init_conv_channels=init_conv_channels,
