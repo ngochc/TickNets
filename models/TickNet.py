@@ -192,7 +192,15 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
         'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
         'large': [[256], [128, 64], [128, 256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]],
     }
+
+    cf_1 = [[256], [128, 64], [128, 256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]]
+    cf_2 = [[256, 128], [64, 128, 256, 512], [256, 128, 64, 128, 256, 512], [256, 128, 64, 128, 256], [512]]
+
     channels = channel_options.get(typesize, channel_options['basic'])
+
+    if type == 'large':
+        channels = cf_2
+
     print(f'THE ACTUAL CHANNEL: {typesize}')
 
     if cifar:
@@ -203,6 +211,8 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
         in_size = (224, 224)
         init_conv_stride = 2
         if typesize == 'basic':
+            strides = [1, 2, 2, 2, 2]
+        elif typesize == 'large':
             strides = [1, 2, 2, 2, 2]
         else:
             strides = [2, 1, 2, 2, 2]
