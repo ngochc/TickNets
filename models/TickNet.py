@@ -185,11 +185,19 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
                    in_size=in_size)
 
 
-def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
+def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, small_cf_index=0):
     init_conv_channels = 32
+    small_cf = [
+        [[256], [128, 64], [128, 256, 512], [256, 128, 64, 128, 256], [512]],
+        [[256], [128, 64], [128, 256, 512, 256], [128, 64, 128, 256], [512]],
+        [[256], [128, 64], [128, 256, 512, 256, 128], [64, 128, 256], [512]],
+        [[256], [128, 64, 128], [256, 512, 256], [128, 64, 128, 256], [512]],
+        [[256], [128, 64, 128], [256, 512, 256, 128], [64, 128, 256], [512]],
+    ]
     channel_options = {
         'basic': [[256 ,128], [64], [128], [256], [512]],
-        'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
+        # 'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
+        'small': small_cf[small_cf_index],
         'large': [[256], [128, 64], [128, 256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]],
     }
 
@@ -202,6 +210,8 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
         channels = cf_2
 
     print(f'THE ACTUAL CHANNEL: {typesize}')
+    print(f'THE small_cf_index: {small_cf_index}')
+    print(f'THE config: {small_cf[small_cf_index]}')
 
     if cifar:
         in_size = (32, 32)
@@ -210,12 +220,13 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False):
     else:
         in_size = (224, 224)
         init_conv_stride = 2
-        if typesize == 'basic':
-            strides = [1, 2, 2, 2, 2]
-        elif typesize == 'large':
-            strides = [1, 2, 2, 2, 2]
-        else:
-            strides = [2, 1, 2, 2, 2]
+        strides = [1, 2, 2, 2, 2]
+        # if typesize == 'basic':
+        #     strides = [1, 2, 2, 2, 2]
+        # elif typesize == 'large':
+        #     strides = [1, 2, 2, 2, 2]
+        # else:
+        #     strides = [2, 1, 2, 2, 2]
     
     return SpatialTickNet(
         num_classes=num_classes,

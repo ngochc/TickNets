@@ -197,8 +197,10 @@ def main():
     # Set the base directory
     arr_architecture_types = args.architecture_types
 
-    for typesize in arr_architecture_types:
-        strmode = f'StanfordDogs_S_TickNet_{typesize}_SE'
+    # for typesize in arr_architecture_types:
+    for small_cf_index in range(5): # Loop over the configuration index from 0 to 4
+        typesize = 'small'
+        strmode = f'StanfordDogs_S_TickNet_{typesize}_SE_smallconfig_{small_cf_index}'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
         filenameLOG = pathout + '/' + strmode + '.txt'
@@ -207,7 +209,7 @@ def main():
             os.makedirs(pathout)
 
         # get model
-        model = build_SpatialTickNet(120, typesize=typesize, cifar=False)
+        model = build_SpatialTickNet(120, typesize=typesize, cifar=False, small_cf_index=small_cf_index)
         model = model.to(device)
 
         print(model)
