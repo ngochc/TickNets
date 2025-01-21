@@ -185,7 +185,7 @@ def build_TickNet(num_classes, typesize='small', cifar=False):
                    in_size=in_size)
 
 
-def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, small_cf_index=0):
+def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0):
     init_conv_channels = 32
     small_cf = [
         [[256], [128, 64], [128, 256, 512], [256, 128, 64, 128, 256], [512]],
@@ -197,7 +197,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, small_cf_in
     channel_options = {
         'basic': [[256 ,128], [64], [128], [256], [512]],
         # 'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
-        'small': small_cf[small_cf_index],
+        'small': small_cf[cf_index],
         'large': [[256], [128, 64], [128, 256, 512, 256, 128, 64, 128, 256], [512, 256, 128, 64, 128, 256], [512]],
     }
 
@@ -210,8 +210,8 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, small_cf_in
         channels = cf_2
 
     print(f'THE ACTUAL CHANNEL: {typesize}')
-    print(f'THE small_cf_index: {small_cf_index}')
-    print(f'THE config: {small_cf[small_cf_index]}')
+    print(f'THE cf_index: {cf_index}')
+    print(f'THE config: {small_cf[cf_index]}')
 
     if cifar:
         in_size = (32, 32)
