@@ -58,8 +58,6 @@ def get_args():
                         help='Base directory for saving checkpoints')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--config', type=int, default=0,
-                        help='Config index for experiment')
     return parser.parse_args()
 
 
@@ -198,9 +196,10 @@ def main():
 
     # Set the base directory
     arr_architecture_types = args.architecture_types
-    cf_index = args.config
+    cf_index = 3
     for typesize in arr_architecture_types:
-        strmode = f'StanfordDogs_S_TickNet_{typesize}_SE_config_{cf_index}'
+        typesize = 'small'
+        strmode = f'StanfordDogs_S_TickNet_{typesize}_SE_smallconfig_{cf_index}'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
         filenameLOG = pathout + '/' + strmode + '.txt'
