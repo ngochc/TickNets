@@ -198,7 +198,6 @@ def main():
     arr_architecture_types = args.architecture_types
     cf_index = 3
     for typesize in arr_architecture_types:
-        typesize = 'small'
         strmode = f'StanfordDogs_S_TickNet_{typesize}_SE_smallconfig_{cf_index}'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
 
