@@ -146,7 +146,7 @@ class SpatialTickNet(TickNet):
                     FR_PDP_block(in_channels=in_channels,
                                  out_channels=unit_channels, stride=stride)
                 )
-                print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
+                #print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
         return in_channels
@@ -398,7 +398,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0)
     channel_options = {
         'basic': [[256 ,128], [64], [128], [256], [512]],
         # 'small': [[256], [128, 64, 128], [256, 512, 256 ,128], [64, 128, 256], [512]],
-        'small': small_cf[cf_index],
+        'small': small_cf[3],
         'large': large_cf[cf_index],
     }
 
@@ -407,7 +407,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0)
 
     print(f'THE ACTUAL CHANNEL: {typesize}')
     print(f'THE cf_index: {cf_index}')
-    print(f'THE config: {small_cf[cf_index]}')
+    print(f'THE config: {channels}')
 
     if cifar:
         in_size = (32, 32)
