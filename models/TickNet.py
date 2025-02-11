@@ -199,7 +199,7 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0)
     init_conv_channels = 32
     basic_cf = [
         [[256 ,128], [64], [128], [256], [512]], # GMac(), Flop (), config 0: 57.96%
-        [[256], [128], [64], [128], [256, 512]], # GMac(), Flop (), config 1:
+        [[256], [128], [64], [128], [256, 512]], # GMac(), Flop (), config 1: 53.99%
     ]
     small_cf = [
         [[256], [128], [64], [128, 256, 512, 256, 128, 64, 128, 256], [512]], #r5: 27.28% -> config 0:
