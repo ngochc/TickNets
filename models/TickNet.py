@@ -51,6 +51,84 @@ class FR_PDP_block(torch.nn.Module):
         return x
 
 
+class QuantizedFR_PDP_block(torch.nn.Module):
+    """
+    Quantized version of FR_PDP_block for TickNet.
+    """
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 stride):
+        super().__init__()
+        self.quant = torch.quantization.QuantStub()
+        self.dequant = torch.quantization.DeQuantStub()
+        
+        # Point-wise convolution 1
+        self.Pw1 = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True)
+        )
+        
+        # Depth-wise convolution
+        self.Dw = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, 
+                     stride=stride, padding=1, groups=in_channels, bias=False),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True)
+        )
+        
+        # Point-wise convolution 2
+        self.Pw2 = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+        
+        # Residual connection
+        self.PwR = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, 
+                     stride=stride, bias=False),
+            nn.BatchNorm2d(out_channels)
+        ) if stride != 1 or in_channels != out_channels else nn.Identity()
+        
+        self.stride = stride
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        
+        # Quantized SE block
+        self.SE = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(out_channels, out_channels // 16, kernel_size=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels // 16, out_channels, kernel_size=1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        x = self.quant(x)
+        residual = x
+        
+        # Main path
+        x = self.Pw1(x)
+        x = self.Dw(x)
+        x = self.Pw2(x)
+        
+        # SE attention
+        se_out = self.SE(x)
+        x = x * se_out
+        
+        # Residual connection
+        if self.stride == 1 and self.in_channels == self.out_channels:
+            x = x + residual
+        else:
+            residual = self.PwR(residual)
+            x = x + residual
+            
+        x = self.dequant(x)
+        return x
+
+
 class TickNet(nn.Module):
     """
     Class for constructing TickNet.
@@ -64,16 +142,21 @@ class TickNet(nn.Module):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True
-                 ):
-
+                 use_data_batchnorm=True,
+                 quantize=False):
         super().__init__()
         self.use_data_batchnorm = use_data_batchnorm
         self.in_size = in_size
+        self.quantize = quantize
+        
+        # Quantization stubs
+        if self.quantize:
+            self.quant = torch.quantization.QuantStub()
+            self.dequant = torch.quantization.DeQuantStub()
 
         self.backbone = torch.nn.Sequential()
 
-       # data batchnorm
+        # data batchnorm
         if self.use_data_batchnorm:
             self.backbone.add_module("data_bn", torch.nn.BatchNorm2d(num_features=in_channels))
 
@@ -97,10 +180,25 @@ class TickNet(nn.Module):
         for stage_id, stage_channels in enumerate(channels):
             stage = torch.nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
-                stride = strides[stage_id] if unit_id == 0 else 1                
-                stage.add_module("unit{}".format(unit_id + 1), FR_PDP_block(in_channels=in_channels, out_channels=unit_channels, stride=stride))
+                stride = strides[stage_id] if unit_id == 0 else 1
+                
+                # Use QuantizedFR_PDP_block if quantization is enabled
+                if self.quantize:
+                    stage.add_module(
+                        f"unit{unit_id + 1}",
+                        QuantizedFR_PDP_block(in_channels=in_channels,
+                                            out_channels=unit_channels,
+                                            stride=stride)
+                    )
+                else:
+                    stage.add_module(
+                        f"unit{unit_id + 1}",
+                        FR_PDP_block(in_channels=in_channels,
+                                   out_channels=unit_channels,
+                                   stride=stride)
+                    )
                 in_channels = unit_channels
-            self.backbone.add_module("stage{}".format(stage_id + 1), stage)
+            self.backbone.add_module(f"stage{stage_id + 1}", stage)
         return in_channels
 
     def init_params(self):
@@ -113,9 +211,29 @@ class TickNet(nn.Module):
         self.classifier.init_params()
 
     def forward(self, x):
+        if self.quantize:
+            x = self.quant(x)
+        
         x = self.backbone(x)
         x = self.classifier(x)
+        
+        if self.quantize:
+            x = self.dequant(x)
+        
         return x
+
+    def prepare_for_quantization(self):
+        """
+        Prepare the model for quantization-aware training.
+        """
+        self.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
+        torch.quantization.prepare_qat(self)
+
+    def convert_to_quantized(self):
+        """
+        Convert the model to a quantized version.
+        """
+        torch.quantization.convert(self, inplace=True)
 
 
 class SpatialTickNet(TickNet):
@@ -131,9 +249,10 @@ class SpatialTickNet(TickNet):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True):
+                 use_data_batchnorm=True,
+                 quantize=False):
         super().__init__(num_classes, init_conv_channels, init_conv_stride,
-                         channels, strides, in_channels, in_size, use_data_batchnorm)
+                         channels, strides, in_channels, in_size, use_data_batchnorm, quantize)
 
     def add_stages(self, in_channels, channels, strides):
         for stage_id, stage_channels in enumerate(channels):
@@ -195,7 +314,20 @@ def get_cf(config_list, cf_index):
         print(f"cf_index {cf_index} is out of range. Using default index 0.")
         return config_list[0]
 
-def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0):
+def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0, quantize=False):
+    """
+    Build SpatialTickNet model with optional quantization support.
+    
+    Args:
+        num_classes (int): Number of output classes
+        typesize (str): Model size ('basic', 'small', or 'large')
+        cifar (bool): Whether to use CIFAR configuration
+        cf_index (int): Configuration index for channel settings
+        quantize (bool): Whether to enable quantization
+    
+    Returns:
+        SpatialTickNet: Configured model instance
+    """
     init_conv_channels = 32
     basic_cf = [
         [[256], [128], [64], [128], [256, 512]], # config: 0, GMac = , Flop = , acc:
@@ -332,11 +464,17 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0)
         else:
             strides = [2, 1, 2, 2, 2]
     
-    return SpatialTickNet(
+    model = SpatialTickNet(
         num_classes=num_classes,
         init_conv_channels=init_conv_channels,
         init_conv_stride=init_conv_stride,
         channels=channels,
         strides=strides,
-        in_size=in_size
+        in_size=in_size,
+        quantize=quantize
     )
+    
+    if quantize:
+        model.prepare_for_quantization()
+    
+    return model
