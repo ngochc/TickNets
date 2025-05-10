@@ -253,22 +253,37 @@ class SpatialTickNet(TickNet):
                  quantize=False):
         super().__init__(num_classes, init_conv_channels, init_conv_stride,
                          channels, strides, in_channels, in_size, use_data_batchnorm, quantize)
+        if self.quantize:
+            self.input_quant = torch.quantization.QuantStub()
+            self.input_dequant = torch.quantization.DeQuantStub()
 
-    def add_stages(self, in_channels, channels, strides):
-        for stage_id, stage_channels in enumerate(channels):
-            stage = nn.Sequential()
-            for unit_id, unit_channels in enumerate(stage_channels):
-                stride = strides[stage_id] if unit_id == 0 else 1
+    def forward(self, x):
+        if self.quantize:
+            x = self.input_quant(x)
+            x = self.quant(x)
+        
+        x = self.backbone(x)
+        x = self.classifier(x)
+        
+        if self.quantize:
+            x = self.dequant(x)
+            x = self.input_dequant(x)
+        
+        return x
 
-                stage.add_module(
-                    "unit{}".format(unit_id + 1),
-                    FR_PDP_block(in_channels=in_channels,
-                                 out_channels=unit_channels, stride=stride)
-                )
-                #print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
-                in_channels = unit_channels
-            self.backbone.add_module("stage{}".format(stage_id + 1), stage)
-        return in_channels
+    def prepare_for_quantization(self):
+        """
+        Prepare the model for quantization-aware training.
+        """
+        self.qconfig = torch.quantization.get_default_qat_qconfig('fbgemm')
+        torch.quantization.prepare_qat(self)
+
+    def convert_to_quantized(self):
+        """
+        Convert the model to a quantized version.
+        """
+        torch.quantization.convert(self, inplace=True)
+
 
 ###
 # %% model definitions

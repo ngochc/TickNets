@@ -59,6 +59,7 @@ def get_args():
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
     parser.add_argument('--config', default=0, type=int, help='config index.')
+    parser.add_argument('--quantize', action='store_true', help='Enable quantization (default: False)')
     return parser.parse_args()
 
 
@@ -208,7 +209,7 @@ def main():
             os.makedirs(pathout)
 
         # get model
-        model = build_SpatialTickNet(120, typesize=typesize, cifar=False, cf_index=cf_index)
+        model = build_SpatialTickNet(120, typesize=typesize, cifar=False, cf_index=cf_index, quantize=quantize)
         model = model.to(device)
 
         print(model)
