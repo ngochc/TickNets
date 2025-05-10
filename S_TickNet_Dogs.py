@@ -189,7 +189,6 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    # args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
 
@@ -199,6 +198,7 @@ def main():
     # Set the base directory
     arr_architecture_types = args.architecture_types
     cf_index = args.config
+    quantize = args.quantize
     for typesize in arr_architecture_types:
         strmode = f'StanfordDogs_S_TickNet_{typesize}_SE_config_{cf_index}'
         pathout = f'{args.base_dir}/checkpoints/{strmode}'
