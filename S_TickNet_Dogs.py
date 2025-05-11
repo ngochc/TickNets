@@ -15,6 +15,7 @@ import torch.optim.lr_scheduler
 import torch.utils.data
 import torchvision.transforms
 import torchvision.datasets
+from torch.cuda.amp import autocast, GradScaler
 
 # from pathlib import Path
 # sys.path.append(str(Path('.').absolute().parent))
@@ -58,6 +59,8 @@ def get_args():
                         help='Base directory for saving checkpoints')
     parser.add_argument('--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
+    parser.add_argument('--amp', action='store_true',
+                        help='Use automatic mixed precision training')
     parser.add_argument('--config', default=0, type=int, help='config index.')
     return parser.parse_args()
 
@@ -142,7 +145,7 @@ def calculate_accuracy(output, target):
         return torch.sum(prediction == target).item() / batch_size
 
 
-def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, device):
+def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, device, scaler=None):
     """
     Run one epoch. If `train` is `True` perform training, otherwise validate.
     """
@@ -160,8 +163,10 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
         images = images.to(device)
         target = target.to(device)
 
-        output = model(images)
-        loss = criterion(output, target)
+        # Use autocast for mixed precision training
+        with autocast(enabled=args.amp):
+            output = model(images)
+            loss = criterion(output, target)
 
         # record loss and measure accuracy
         loss_item = loss.item()
@@ -172,8 +177,14 @@ def run_epoch(train, data_loader, model, criterion, optimizer, n_epoch, args, de
         # compute gradient and do SGD step
         if train:
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            if args.amp:
+                # Use scaler for mixed precision training
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
 
         if (n_batch % 10) == 0:
             print('[{}]  epoch {}/{},  batch {}/{},  loss_{}={:.5f},  acc_{}={:.2f}%'.format('train' if train else ' val ', n_epoch + 1,
@@ -191,6 +202,11 @@ def main():
     # args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
+    if args.amp:
+        print('Using Automatic Mixed Precision (AMP) training')
+        scaler = GradScaler()
+    else:
+        scaler = None
 
     # print model with parameter and FLOPs counts
     torch.autograd.set_detect_anomaly(True)
@@ -247,7 +263,7 @@ def main():
                 return
             m = time.time()
             (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
-                                                 criterion=criterion, optimizer=None, n_epoch=0, args=args, device=device)
+                                                 criterion=criterion, optimizer=None, n_epoch=0, args=args, device=device, scaler=scaler)
             print(
                 f'[ validating: ], loss_val={val_loss:.5f}, acc_val={100.0 * val_accuracy:.2f}%'
             )
@@ -266,11 +282,11 @@ def main():
 
             # train
             (train_loss, train_accuracy) = run_epoch(train=True, data_loader=train_loader, model=model,
-                                                     criterion=criterion, optimizer=optimizer, n_epoch=n_epoch, args=args, device=device)
+                                                     criterion=criterion, optimizer=optimizer, n_epoch=n_epoch, args=args, device=device, scaler=scaler)
 
             # validate
             (val_loss, val_accuracy) = run_epoch(train=False, data_loader=val_loader, model=model,
-                                                 criterion=criterion, optimizer=None, n_epoch=n_epoch, args=args, device=device)
+                                                 criterion=criterion, optimizer=None, n_epoch=n_epoch, args=args, device=device, scaler=scaler)
             if (val_accuracy_max is None) or (val_accuracy > val_accuracy_max):
                 val_accuracy_max = val_accuracy
                 val_accuracy_argmax = n_epoch
