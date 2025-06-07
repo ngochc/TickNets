@@ -240,6 +240,7 @@ def main():
             print(line)
             print('=' * len(line))
             wA.writeLogAcc(filenameLOG,line)
+            wA.log_results_to_csv(pathout + '/' + strmode + '.csv', n_epoch, loss_train, acc_train, loss_val, acc_val)
 
 if __name__ == '__main__':
     try:
