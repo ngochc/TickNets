@@ -25,31 +25,35 @@ def get_args():
     """
     parser = argparse.ArgumentParser(description='TickNet training script for cifar and StanfordDogs datasets.', formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('-r', '--data-root', type=str, default='../../../datasets/StanfordDogs', help='Dataset root path.')
-    #parser.add_argument('-d', '--dataset', choices=['cifar10', 'cifar100', 'dogs'], required=True, help='Dataset name.')
+    # parser.add_argument('-d', '--dataset', choices=['cifar10', 'cifar100', 'dogs'], required=True, help='Dataset name.')
     parser.add_argument('-d', '--dataset', type=str, choices=['cifar10', 'cifar100', 'dogs'], default='dogs', help='Dataset name.')
-    parser.add_argument('--download', action='store_true', help='Download the specified dataset before running the training.')    
+    parser.add_argument('--architecture-types', nargs='+', default=['basic', 'small', 'large'], help='List of architecture types to use.')    
+    parser.add_argument('--download', action='store_true', help='Download the specified dataset before running the training.')
     parser.add_argument('-g', '--gpu-id', default=1, type=int, help='ID of the GPU to use. Set to -1 to use CPU.')
     parser.add_argument('-j', '--workers', default=4, type=int, help='Number of data loading workers.')
-    parser.add_argument('-b', '--batch-size', default=64, type=int, help='Batch size.')        
+    parser.add_argument('-b', '--batch-size', default=64, type=int, help='Batch size.')
     parser.add_argument('-e', '--epochs', default=200, type=int, help='Number of total epochs to run.')
     parser.add_argument('-l', '--learning-rate', default=0.1, type=float, help='Initial learning rate.')
-    parser.add_argument('-s', '--schedule', nargs='+', default=[100, 150, 180], type=int, help='Learning rate schedule (epochs after which the learning rate should be dropped).')    
+    parser.add_argument('-s', '--schedule', nargs='+', default=[100, 150, 180], type=int, help='Learning rate schedule (epochs after which the learning rate should be dropped).')
     parser.add_argument('-m', '--momentum', default=0.9, type=float, help='SGD momentum.')
-    parser.add_argument('-w', '--weight-decay', default=1e-4, type=float, help='SGD weight decay.')    
-    parser.add_argument('--evaluate', dest='evaluate', action='store_true',
-                        help='evaluate model on validation set')
+    parser.add_argument('-w', '--weight-decay', default=1e-4, type=float, help='SGD weight decay.')
+    # Add the base directory argument
+    parser.add_argument('--base-dir', type=str, default='.', help='Base directory for saving checkpoints and reports.')
+    parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
     return parser.parse_args()
 
 
 def get_device(args):
     """
-    Determine the device to use for the given arguments.
+    Determine the device to use for the given arguments, including MPS for Mac Silicon.
     """
-    if args.gpu_id >= 0:
+    if args.gpu_id >= 0 and torch.cuda.is_available():
         return torch.device('cuda:{}'.format(args.gpu_id))
+    elif torch.backends.mps.is_available():
+        return torch.device('mps')
     else:
         return torch.device('cpu')
-    
+
 
 def get_data_loader(args, train):
     """
@@ -161,17 +165,19 @@ def main():
     """
     args = get_args()
     print('Command: {}'.format(' '.join(sys.argv)))
-    args.gpu_id = 1
+    # args.gpu_id = 1
     device = get_device(args)
     print('Using device {}'.format(device))
     
     # print model with parameter and FLOPs counts    
     torch.autograd.set_detect_anomaly(True)     
-    
-    arr_typesize = ['basic', 'small', 'large']
-    for typesize in arr_typesize:    
-        strmode = 'StanfordDogs_TickNet_' + typesize + '_SE'  
-        pathout = './checkpoints/' + strmode
+
+    arr_architecture_types = args.architecture_types
+    for typesize in arr_architecture_types:
+        strmode = f'StanfordDogs_TickNet_{typesize}_SE'
+
+        pathout = f'{args.base_dir}/checkpoints/{strmode}'
+
         filenameLOG = pathout + '/' + strmode + '.txt'
         if not os.path.exists(pathout):
             os.makedirs(pathout)
