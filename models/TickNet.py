@@ -328,9 +328,9 @@ def build_SpatialTickNet(num_classes, typesize='basic', cifar=False, cf_index=0)
         in_size = (224, 224)
         init_conv_stride = 2
         if typesize == 'basic' and cf_index < 5:
-            strides = [1, 2, 2, 2, 2]
-        else:
             strides = [2, 1, 2, 2, 2]
+        else:
+            strides = [1, 2, 2, 2, 2]
     
     return SpatialTickNet(
         num_classes=num_classes,
