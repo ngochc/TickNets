@@ -82,7 +82,14 @@ class TickNet(nn.Module):
 
         # stages
         in_channels = init_conv_channels
-        in_channels = self.add_stages(in_channels, channels, strides)
+        for stage_id, stage_channels in enumerate(channels):
+            stage = torch.nn.Sequential()
+            for unit_id, unit_channels in enumerate(stage_channels):
+                stride = strides[stage_id] if unit_id == 0 else 1                
+                stage.add_module("unit{}".format(unit_id + 1), FR_PDP_block(in_channels=in_channels, out_channels=unit_channels, stride=stride))
+                in_channels = unit_channels
+            self.backbone.add_module("stage{}".format(stage_id + 1), stage)
+
         self.final_conv_channels = 1024        
 
         self.backbone.add_module("final_conv", conv1x1_block(in_channels=in_channels, out_channels=self.final_conv_channels, activation="relu"))
@@ -92,16 +99,6 @@ class TickNet(nn.Module):
         self.classifier = Classifier(in_channels=in_channels, num_classes=num_classes)
 
         self.init_params()
-
-    def add_stages(self, in_channels, channels, strides):
-        for stage_id, stage_channels in enumerate(channels):
-            stage = torch.nn.Sequential()
-            for unit_id, unit_channels in enumerate(stage_channels):
-                stride = strides[stage_id] if unit_id == 0 else 1                
-                stage.add_module("unit{}".format(unit_id + 1), FR_PDP_block(in_channels=in_channels, out_channels=unit_channels, stride=stride))
-                in_channels = unit_channels
-            self.backbone.add_module("stage{}".format(stage_id + 1), stage)
-        return in_channels
 
     def init_params(self):
         for name, module in self.backbone.named_modules():
@@ -131,11 +128,24 @@ class SpatialTickNet(TickNet):
                  strides,
                  in_channels=3,
                  in_size=(224, 224),
-                 use_data_batchnorm=True):
-        super().__init__(num_classes, init_conv_channels, init_conv_stride,
-                         channels, strides, in_channels, in_size, use_data_batchnorm)
+                 use_data_batchnorm=True
+                 ):
 
-    def add_stages(self, in_channels, channels, strides):
+        super().__init__()
+        self.use_data_batchnorm = use_data_batchnorm
+        self.in_size = in_size
+
+        self.backbone = torch.nn.Sequential()
+
+       # data batchnorm
+        if self.use_data_batchnorm:
+            self.backbone.add_module("data_bn", torch.nn.BatchNorm2d(num_features=in_channels))
+
+        # init conv
+        self.backbone.add_module("init_conv", conv3x3_block(in_channels=in_channels, out_channels=init_conv_channels, stride=init_conv_stride))
+
+        # stages
+        in_channels = init_conv_channels
         for stage_id, stage_channels in enumerate(channels):
             stage = nn.Sequential()
             for unit_id, unit_channels in enumerate(stage_channels):
@@ -149,7 +159,30 @@ class SpatialTickNet(TickNet):
                 #print(f'add_stages: stage({stage_id + 1}), node({unit_id + 1}), stride({stride})')
                 in_channels = unit_channels
             self.backbone.add_module("stage{}".format(stage_id + 1), stage)
-        return in_channels
+
+        self.final_conv_channels = 1024        
+
+        self.backbone.add_module("final_conv", conv1x1_block(in_channels=in_channels, out_channels=self.final_conv_channels, activation="relu"))
+        self.backbone.add_module("global_pool", torch.nn.AdaptiveAvgPool2d(output_size=1))
+        in_channels = self.final_conv_channels
+        # classifier
+        self.classifier = Classifier(in_channels=in_channels, num_classes=num_classes)
+
+        self.init_params()
+
+    def init_params(self):
+        for name, module in self.backbone.named_modules():
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
+        self.classifier.init_params()
+
+    def forward(self, x):
+        x = self.backbone(x)
+        x = self.classifier(x)
+        return x
 
 ###
 # %% model definitions
